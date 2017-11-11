@@ -31,10 +31,10 @@ def parse_args():
 
 
 def load_original_image(path_to_original_image):
-        try:
-            return Image.open(path_to_original_image)
-        except (FileNotFoundError, IOError):
-            return None
+    try:
+        return Image.open(path_to_original_image)
+    except (FileNotFoundError, IOError):
+        return None
 
 
 def write_resized_image(resized_image, output_dir, original_dir):
@@ -51,6 +51,22 @@ def write_resized_image(resized_image, output_dir, original_dir):
         return None
 
 
+def resize_by_width_height(image, **kwargs):
+    width, height = kwargs.get('width'), kwargs.get('height')
+    if not width:
+        hratio = height / float(image.height)
+        width = int(float(image.width) * float(hratio))
+    if not height:
+        wratio = width / float(image.width)
+        height = int(float(image.height) * float(wratio))
+    current_aspect = round(float(image.height) / float(image.width), 1)
+    expected_aspect = round(height / width, 1)
+    if current_aspect != expected_aspect:
+        logging.warning("Desired height width aspect ratio "
+                        "does not match the current")
+    return image.resize((width, height))
+
+
 def get_resized_image(image, scale, height, width):
     if not image:
         return None
@@ -58,21 +74,10 @@ def get_resized_image(image, scale, height, width):
                                                               image.height))
     if scale:
         img = image.resize((int(image.width*scale), int(image.height*scale)))
-    elif width and height:
-        current_aspect = round(float(image.height) / float(image.width), 1)
-        expected_aspect = round(height/width, 1)
-        if current_aspect != expected_aspect:
-            logging.warning("Desired height width aspect ratio "
-                            "does not match the current")
-        img = image.resize((width, height))
-    elif width:
-        wratio = width/float(image.width)
-        hsize = int(float(image.height)*float(wratio))
-        img = image.resize((width, hsize))
-    elif height:
-        hratio = height / float(image.height)
-        wsize = int(float(image.width) * float(hratio))
-        img = image.resize((wsize, height))
+    elif width or height:
+        img = resize_by_width_height(image, height=height, width=width)
+    else:
+        return None
     return img
 
 
@@ -82,9 +87,6 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging_level)
     if cmd_args.scale and (cmd_args.width or cmd_args.height):
         sys.exit("Incompatible program arguments, "
-                 "please use --help for more details")
-    if not cmd_args.scale and not (cmd_args.width or cmd_args.height):
-        sys.exit("missing program arguments, "
                  "please use --help for more details")
     image_dir_path = Path(cmd_args.image_dir)
     origional_image = load_original_image(image_dir_path)
@@ -98,5 +100,4 @@ if __name__ == '__main__':
     if resized_image_path:
         print("Resized image location", resized_image_path)
     else:
-        print("Bad original image or/and output dir is wrong",
-              image_dir_path, cmd_args.output_dir)
+        print("Bad original image or/and missing/incorrect program args")
