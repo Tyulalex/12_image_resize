@@ -96,7 +96,7 @@ if __name__ == '__main__':
                                              cmd_args.output_dir,
                                              image_dir_path)
     if resized_image_path:
-            print("Resized image location", resized_image_path)
+        print("Resized image location", resized_image_path)
     else:
         print("Bad original image or/and output dir is wrong",
               image_dir_path, cmd_args.output_dir)
