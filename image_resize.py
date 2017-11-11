@@ -22,41 +22,48 @@ def parse_args():
     parser.add_argument(
         '-w', '--width', type=int, help='Desired width of image')
     parser.add_argument(
-        '--image_dir', required=True, help='Path to initial image')
+        '-imd', '--image_dir', required=True, help='Path to initial image')
     parser.add_argument(
-        '--output_dir', help='Path to resulted image')
+        '-otd', '--output_dir', help='Path to resulted image')
     parser.add_argument(
-        '-v', '--verbose', action='count', default=0)
+        '-v', '--verbose', help='log level', action='count', default=0)
     return parser.parse_args()
 
 
 def load_original_image(path_to_original_image):
         try:
             return Image.open(path_to_original_image)
-        except FileNotFoundError:
+        except (FileNotFoundError, IOError):
             return None
 
 
 def write_resized_image(resized_image, output_dir, original_dir):
     img_name_template = '{name}__{width}X{height}{ext}'
-    resized_image_name = img_name_template.format(name=original_dir.stem,
-                                                  width=resized_image.width,
-                                                  height=resized_image.height,
-                                                  ext=original_dir.suffix)
-    location = output_dir if output_dir else original_dir.parent
-    resized_image_path = Path(location).joinpath(Path(resized_image_name))
     try:
+        resized_image_name = img_name_template.format(
+            name=original_dir.stem, width=resized_image.width,
+            height=resized_image.height, ext=original_dir.suffix)
+        location = output_dir if output_dir else original_dir.parent
+        resized_image_path = Path(location).joinpath(Path(resized_image_name))
         resized_image.save(resized_image_path)
         return resized_image_path
-    except FileNotFoundError:
+    except (FileNotFoundError, IOError, AttributeError):
         return None
 
 
 def get_resized_image(image, scale, height, width):
-    logging.debug("Original image widthXsize", image.width, image.height)
+    if not image:
+        return None
+    logging.debug("Original image widthXheight: {}X{}".format(image.width,
+                                                              image.height))
     if scale:
         img = image.resize((int(image.width*scale), int(image.height*scale)))
     elif width and height:
+        current_aspect = round(float(image.height) / float(image.width), 1)
+        expected_aspect = round(height/width, 1)
+        if current_aspect != expected_aspect:
+            logging.warning("Desired height width aspect ratio "
+                            "does not match the current")
         img = image.resize((width, height))
     elif width:
         wratio = width/float(image.width)
@@ -81,16 +88,15 @@ if __name__ == '__main__':
                  "please use --help for more details")
     image_dir_path = Path(cmd_args.image_dir)
     origional_image = load_original_image(image_dir_path)
-    if origional_image:
-        resized_image = get_resized_image(origional_image,
-                                          scale=cmd_args.scale,
-                                          height=cmd_args.height,
-                                          width=cmd_args.width)
-        resized_image_path = write_resized_image(resized_image,
-                                                 cmd_args.output_dir,
-                                                 image_dir_path)
-        if resized_image_path:
-            print("Resized image location ", str(resized_image_path))
-        else:
-            print("Original image is damaged or output dir is wrong",
-                  image_dir_path, cmd_args.output_dir)
+    resized_image = get_resized_image(origional_image,
+                                      scale=cmd_args.scale,
+                                      height=cmd_args.height,
+                                      width=cmd_args.width)
+    resized_image_path = write_resized_image(resized_image,
+                                             cmd_args.output_dir,
+                                             image_dir_path)
+    if resized_image_path:
+            print("Resized image location", resized_image_path)
+    else:
+        print("Bad original image or/and output dir is wrong",
+              image_dir_path, cmd_args.output_dir)
